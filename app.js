@@ -1,11 +1,6 @@
-const APP_VERSION = "block-types-lighting-1";
+const APP_VERSION = "live-wall-settings-1";
 
 const state = {
-  tileTypes: {},
-  lighting: false,
-  lightAngle: 135,
-  lightLength: 70,
-  lightRadius: 180,
   tileW: 64,
   tileH: 64,
   margin: 0,
@@ -117,57 +112,6 @@ function selectedTileEntry() {
     anchor: state.layerIsoAnchor?.[state.layer] ?? "origin",
     rise: state.stackRise
   };
-}
-
-const BLOCK_TYPES = ["none", "solid", "translucent", "plantation", "light"];
-const TYPE_MARKERS = {
-  solid: "#c9c4bb",
-  translucent: "#6fb6d9",
-  plantation: "#7fbf5a",
-  light: "#f1d06a"
-};
-const tileColorCache = new Map();
-
-function tileTypeKey(set, tile) {
-  return `${set}:${tile}`;
-}
-
-function getTileType(set, tile) {
-  return state.tileTypes[tileTypeKey(set, tile)] ?? "none";
-}
-
-function setTileType(set, tile, type) {
-  const key = tileTypeKey(set, tile);
-  if (type === "none") {
-    delete state.tileTypes[key];
-  } else {
-    state.tileTypes[key] = type;
-  }
-}
-
-// Average color of a tile, used to tint translucent shadows and light glows.
-function tileAverageColor(set, tileId) {
-  const key = tileTypeKey(set, tileId);
-  if (tileColorCache.has(key)) return tileColorCache.get(key);
-  const tileset = state.tilesets[set];
-  const src = tileSourceRect(tileId, set);
-  let color = { r: 220, g: 220, b: 220 };
-  if (tileset && src) {
-    const probe = document.createElement("canvas");
-    probe.width = 1;
-    probe.height = 1;
-    const pctx = probe.getContext("2d", { willReadFrequently: true });
-    pctx.imageSmoothingEnabled = true;
-    pctx.drawImage(tileset.image, src.x, src.y, src.w, src.h, 0, 0, 1, 1);
-    try {
-      const [r, g, b, a] = pctx.getImageData(0, 0, 1, 1).data;
-      if (a > 0) color = { r, g, b };
-    } catch (err) {
-      // cross-origin or empty tile; keep the fallback color
-    }
-  }
-  tileColorCache.set(key, color);
-  return color;
 }
 
 function parseTileRef(value) {
@@ -370,17 +314,6 @@ function drawTileset() {
   for (let i = 0; i < set.tileCount; i++) {
     const rect = tileSourceRect(i);
     tilesetCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w, rect.h);
-    const marker = TYPE_MARKERS[getTileType(state.activeTileset, i)];
-    if (marker) {
-      const r = Math.max(3, Math.min(7, state.tileW / 10));
-      tilesetCtx.fillStyle = marker;
-      tilesetCtx.strokeStyle = "rgba(0,0,0,0.6)";
-      tilesetCtx.lineWidth = 1;
-      tilesetCtx.beginPath();
-      tilesetCtx.arc(rect.x + r + 2, rect.y + r + 2, r, 0, Math.PI * 2);
-      tilesetCtx.fill();
-      tilesetCtx.stroke();
-    }
   }
 
   if (set.tileCount > 0) {
@@ -390,15 +323,6 @@ function drawTileset() {
     tilesetCtx.lineWidth = 3;
     tilesetCtx.strokeRect(selected.x + 1.5, selected.y + 1.5, selected.w - 2, selected.h - 2);
   }
-
-  syncTileTypeButtons();
-}
-
-function syncTileTypeButtons() {
-  const type = getTileType(state.activeTileset, state.selectedTile);
-  document.querySelectorAll("#tileType button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.type === type);
-  });
 }
 
 function recalcTilesets() {
@@ -440,200 +364,6 @@ function renderObjectList() {
   });
 }
 
-// --- Lighting / shadows -----------------------------------------------------
-
-function cellFootprint(x, y, tileDrawW, tileDrawH) {
-  const p = cellToScreen(x, y, tileDrawW, tileDrawH);
-  if (state.projection === "isometric") {
-    const cellH = isoCellHeight(tileDrawW, tileDrawH);
-    return [
-      { x: p.x + tileDrawW / 2, y: p.y },
-      { x: p.x + tileDrawW, y: p.y + cellH / 2 },
-      { x: p.x + tileDrawW / 2, y: p.y + cellH },
-      { x: p.x, y: p.y + cellH / 2 }
-    ];
-  }
-  return [
-    { x: p.x, y: p.y },
-    { x: p.x + tileDrawW, y: p.y },
-    { x: p.x + tileDrawW, y: p.y + tileDrawH },
-    { x: p.x, y: p.y + tileDrawH }
-  ];
-}
-
-function polygonCentroid(points) {
-  const sum = points.reduce((acc, pt) => ({ x: acc.x + pt.x, y: acc.y + pt.y }), { x: 0, y: 0 });
-  return { x: sum.x / points.length, y: sum.y / points.length };
-}
-
-// Andrew's monotone chain convex hull, used to sweep a footprint into its cast shadow.
-function convexHull(points) {
-  const pts = points.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y));
-  if (pts.length < 3) return pts;
-  const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-  const lower = [];
-  for (const pt of pts) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], pt) <= 0) lower.pop();
-    lower.push(pt);
-  }
-  const upper = [];
-  for (let i = pts.length - 1; i >= 0; i--) {
-    const pt = pts[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], pt) <= 0) upper.pop();
-    upper.push(pt);
-  }
-  lower.pop();
-  upper.pop();
-  return lower.concat(upper);
-}
-
-function fillPolygon(ctx, points) {
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (const pt of points.slice(1)) ctx.lineTo(pt.x, pt.y);
-  ctx.closePath();
-  ctx.fill();
-}
-
-// Deterministic pseudo-random in [0,1) so dappled shadows stay stable per cell.
-function cellRandom(x, y, salt) {
-  const n = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
-  return n - Math.floor(n);
-}
-
-// What kind of shadow a cell casts: looks at the height layers (detail/stack/above).
-function cellCasterInfo(x, y) {
-  const priority = { solid: 3, translucent: 2, plantation: 1 };
-  let chosen = null;
-  let chosenRank = 0;
-  let height = 1;
-  let color = null;
-  const consider = entry => {
-    if (!entry) return;
-    const type = getTileType(entry.set, entry.tile);
-    if (type === "light") return; // lights are handled separately and cast no shadow
-    const rank = priority[type] ?? 0;
-    if (rank === 0) return;
-    if (rank > chosenRank) {
-      chosenRank = rank;
-      chosen = type;
-      color = tileAverageColor(entry.set, entry.tile);
-    }
-  };
-  consider(normalizeTileEntry(state.layers.detail[y][x]));
-  consider(normalizeTileEntry(state.layers.above[y][x]));
-  const stack = parseTileStack(state.layers.stack[y][x]);
-  if (stack.length) {
-    height = Math.max(height, stack.length);
-    for (const entry of stack) consider(entry);
-  }
-  if (!chosen) return null;
-  return { type: chosen, height, color: color ?? { r: 220, g: 220, b: 220 } };
-}
-
-// A cell emits light if any of its tiles (any layer) is tagged as a light source.
-function cellLightInfo(x, y) {
-  const layers = ["ground", "detail", "above"];
-  for (const name of layers) {
-    const entry = normalizeTileEntry(state.layers[name][y][x]);
-    if (entry && getTileType(entry.set, entry.tile) === "light") {
-      return { color: tileAverageColor(entry.set, entry.tile) };
-    }
-  }
-  for (const entry of parseTileStack(state.layers.stack[y][x])) {
-    if (getTileType(entry.set, entry.tile) === "light") {
-      return { color: tileAverageColor(entry.set, entry.tile) };
-    }
-  }
-  return null;
-}
-
-function drawCastShadow(ctx, x, y, info, tileDrawW, tileDrawH, offsetX, offsetY) {
-  const foot = cellFootprint(x, y, tileDrawW, tileDrawH);
-  const ox = offsetX * info.height;
-  const oy = offsetY * info.height;
-  const hull = convexHull([...foot, ...foot.map(pt => ({ x: pt.x + ox, y: pt.y + oy }))]);
-  const c = info.color;
-  if (info.type === "solid") {
-    ctx.fillStyle = "rgba(6, 8, 14, 0.5)";
-    fillPolygon(ctx, hull);
-    return;
-  }
-  if (info.type === "translucent") {
-    // colored, distorted shadow: a tinted body plus a softer, shifted echo
-    ctx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, 0.4)`;
-    fillPolygon(ctx, hull);
-    const wobble = convexHull([
-      ...foot.map(pt => ({ x: pt.x + ox * 1.18 + tileDrawW * 0.06, y: pt.y + oy * 1.18 })),
-      ...foot.map(pt => ({ x: pt.x + ox * 0.5, y: pt.y + oy * 0.5 }))
-    ]);
-    ctx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, 0.22)`;
-    fillPolygon(ctx, wobble);
-    return;
-  }
-  if (info.type === "plantation") {
-    // weird, broken-up shadow: faint base + scattered dapples of light through leaves
-    ctx.fillStyle = "rgba(18, 30, 14, 0.18)";
-    fillPolygon(ctx, hull);
-    const center = polygonCentroid(foot);
-    const span = Math.max(tileDrawW, tileDrawH);
-    ctx.fillStyle = "rgba(10, 22, 8, 0.34)";
-    for (let i = 0; i < 7; i++) {
-      const rx = (cellRandom(x, y, i) - 0.5) * span * 0.7;
-      const ry = (cellRandom(x, y, i + 20) - 0.5) * span * 0.5;
-      const r = span * (0.08 + cellRandom(x, y, i + 40) * 0.12);
-      ctx.beginPath();
-      ctx.arc(center.x + ox + rx, center.y + oy + ry, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-}
-
-function drawLighting(ctx, tileDrawW, tileDrawH) {
-  if (!state.lighting) return;
-  const rad = (state.lightAngle * Math.PI) / 180;
-  const reach = state.lightLength / 100;
-  const cellH = isoCellHeight(tileDrawW, tileDrawH);
-  const offsetX = Math.cos(rad) * reach * tileDrawW;
-  const offsetY = Math.sin(rad) * reach * (state.projection === "isometric" ? cellH : tileDrawH);
-
-  const cells = [];
-  for (let y = 0; y < state.mapH; y++) {
-    for (let x = 0; x < state.mapW; x++) cells.push({ x, y });
-  }
-  if (state.projection === "isometric") {
-    cells.sort((a, b) => (a.x + a.y) - (b.x + b.y) || a.x - b.x);
-  }
-
-  ctx.save();
-  for (const { x, y } of cells) {
-    const info = cellCasterInfo(x, y);
-    if (info) drawCastShadow(ctx, x, y, info, tileDrawW, tileDrawH, offsetX, offsetY);
-  }
-  ctx.restore();
-
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  const scale = state.tileW > 0 ? tileDrawW / state.tileW : 1;
-  const radius = state.lightRadius * scale;
-  for (const { x, y } of cells) {
-    const light = cellLightInfo(x, y);
-    if (!light) continue;
-    const center = polygonCentroid(cellFootprint(x, y, tileDrawW, tileDrawH));
-    if (radius <= 0) continue;
-    const glow = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, radius);
-    const c = light.color;
-    glow.addColorStop(0, `rgba(${c.r}, ${c.g}, ${c.b}, 0.55)`);
-    glow.addColorStop(0.5, `rgba(${c.r}, ${c.g}, ${c.b}, 0.22)`);
-    glow.addColorStop(1, `rgba(${c.r}, ${c.g}, ${c.b}, 0)`);
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
 function drawMap() {
   mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
   mapCtx.imageSmoothingEnabled = false;
@@ -645,7 +375,6 @@ function drawMap() {
   mapCtx.translate(Math.round(state.offsetX), Math.round(state.offsetY));
   drawMapTiles(mapCtx, tileDrawW, tileDrawH);
   drawObjects(mapCtx, state.zoom);
-  drawLighting(mapCtx, tileDrawW, tileDrawH);
 
   for (let y = 0; y < state.mapH; y++) {
     for (let x = 0; x < state.mapW; x++) {
@@ -1414,15 +1143,10 @@ function download(filename, content, type) {
 
 function projectData() {
   return {
-    version: 5,
+    version: 4,
     kind: "low-topdown-map",
     tileW: state.tileW,
     tileH: state.tileH,
-    tileTypes: state.tileTypes,
-    lighting: state.lighting,
-    lightAngle: state.lightAngle,
-    lightLength: state.lightLength,
-    lightRadius: state.lightRadius,
     margin: state.margin,
     spacing: state.spacing,
     projection: state.projection,
@@ -1476,7 +1200,6 @@ function exportPng() {
   outCtx.imageSmoothingEnabled = false;
   drawMapTiles(outCtx, state.tileW, state.tileH);
   drawObjects(outCtx, 1);
-  drawLighting(outCtx, state.tileW, state.tileH);
   out.toBlob(blob => download("map.png", blob, "image/png"));
 }
 
@@ -1531,11 +1254,6 @@ async function loadProject(file) {
   Object.assign(state, {
     tileW: data.tileW,
     tileH: data.tileH,
-    tileTypes: data.tileTypes ?? {},
-    lighting: data.lighting ?? false,
-    lightAngle: data.lightAngle ?? 135,
-    lightLength: data.lightLength ?? 70,
-    lightRadius: data.lightRadius ?? 180,
     margin: data.margin ?? 0,
     spacing: data.spacing ?? 0,
     projection: data.projection ?? "orthogonal",
@@ -1583,11 +1301,6 @@ async function loadProject(file) {
     document.querySelector(`#${id}`).value = state[id];
   }
   document.querySelector("#isoStepH").value = state.isoStepH;
-  tileColorCache.clear();
-  document.querySelector("#lightAngle").value = state.lightAngle;
-  document.querySelector("#lightLength").value = state.lightLength;
-  document.querySelector("#lightRadius").value = state.lightRadius;
-  document.querySelector("#toggleLighting").classList.toggle("active", state.lighting);
   syncLayerLiftInput();
   document.querySelectorAll("#projection button").forEach(button => {
     button.classList.toggle("active", button.dataset.projection === state.projection);
@@ -1630,34 +1343,6 @@ function wireUi() {
   }
 
   document.querySelector("#skewTile").addEventListener("click", generateSkewTileset);
-
-  document.querySelector("#tileType").addEventListener("click", event => {
-    const button = event.target.closest("button");
-    if (!button) return;
-    if (!activeTileset()) {
-      setStatus("Add a tileset first");
-      return;
-    }
-    setTileType(state.activeTileset, state.selectedTile, button.dataset.type);
-    syncTileTypeButtons();
-    drawTileset();
-    drawMap();
-    setStatus(`Tile ${state.selectedTile}: ${button.dataset.type}`);
-  });
-
-  document.querySelector("#toggleLighting").addEventListener("click", event => {
-    state.lighting = !state.lighting;
-    event.target.classList.toggle("active", state.lighting);
-    drawMap();
-    setStatus(state.lighting ? "Lighting preview on" : "Lighting preview off");
-  });
-
-  for (const id of ["lightAngle", "lightLength", "lightRadius"]) {
-    document.querySelector(`#${id}`).addEventListener("change", event => {
-      state[id] = Number(event.target.value);
-      drawMap();
-    });
-  }
 
   document.querySelector("#tilesetInput").addEventListener("change", event => {
     const files = [...event.target.files];

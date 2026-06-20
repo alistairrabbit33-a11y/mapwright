@@ -16,8 +16,6 @@ Current features:
 - Ctrl+Z undo for the last paint stroke
 - Space + mouse drag canvas panning
 - Resizeable map grid
-- Block-type tagging (solid, translucent, plantation, light) for type-aware shadows
-- Lighting preview with directional sun shadows and emissive light sources
 - Save/load project JSON
 - Export clean map JSON
 - Export clean map PNG
@@ -43,17 +41,3 @@ Use `Layer Lift` and `Iso Anchor` to make the active tile layer render upward. T
 Use the `Stack` layer when you want to build wall height. `Wall Height` controls how many copies Brush, Box, and Fill add at once. `Height Step` controls how far upward each copy is drawn. Brush adds the selected tile to the top of the stack, Erase removes the top stacked tile, Pick selects the top stacked tile, and Fill replaces matching stacks with the selected wall height.
 
 Newly painted tiles remember their `Iso Anchor` and `Height Step`. When you change `Wall Height`, `Height Step`, or `Iso Anchor`, matching copies of the selected tile on the active layer retune automatically. `Layer Lift` is layer-wide and moves the whole active layer live, which is useful while tuning a wall up or down.
-
-## Block types and lighting
-
-The editor is universal across textures, so it cannot guess what a tile is made of. The `Block Type` control in the Tileset panel lets you classify the selected tile so the renderer knows how it should cast shadow. Pick a tile, then tag it:
-
-- `Solid` (dirt, marble, stone): casts a full, dark cast shadow.
-- `Glass` / translucent (water, glass): casts a colored, slightly distorted shadow tinted by the tile's own color.
-- `Plant` / plantation (foliage): casts a broken-up, dappled shadow that lets light filter through the leaves.
-- `Light` (bulbs, light blocks): casts no shadow and instead emits a colored glow that brightens nearby cells and washes out their shadows.
-- `None` (default): treated as flat floor and casts nothing, so ground tiles do not shadow themselves.
-
-Tagged tiles show a colored dot in the tileset grid. Classifications are stored per tileset tile and saved with the project (and included in the exported `map.json`, so a game engine can read each tile's `tileTypes` entry).
-
-Turn on `Lighting Preview` in the Lighting panel to see the shadow pass. Only the height layers (`Detail`, `Stack`, `Above`) cast shadows, and a `Stack` block casts a longer shadow the taller it is; light sources emit from any layer. `Sun Angle` sets the shadow direction in degrees, `Shadow Len` sets how far shadows stretch (percent of a tile), and `Light Radius` sets the glow size for light blocks. The lighting pass is also baked into the exported PNG when the preview is on.

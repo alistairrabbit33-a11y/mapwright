@@ -216,27 +216,6 @@ input[type="file"] {
   gap: 6px;
 }
 
-.type-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.type-grid button {
-  min-height: 30px;
-  padding: 6px 4px;
-  font-size: 12px;
-}
-
-#tileType button[data-type="solid"].active { background: #c9c4bb; border-color: #c9c4bb; }
-#tileType button[data-type="translucent"].active { background: #6fb6d9; border-color: #6fb6d9; }
-#tileType button[data-type="plantation"].active { background: #7fbf5a; border-color: #7fbf5a; }
-#tileType button[data-type="light"].active { background: #f1d06a; border-color: #f1d06a; }
-
-.type-hint {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
 .toolbar {
   display: flex;
   align-items: center;
