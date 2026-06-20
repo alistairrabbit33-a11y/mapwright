@@ -32,7 +32,7 @@ Placed objects can be selected by clicking them on the canvas. Drag a selected o
 
 Use the `Top` / `Iso` buttons in the Map panel to switch projection. Use `Top` for rectangular tiles and `Iso` for diamond tiles. `Flat Iso` changes iso row spacing without cutting off the tile art. `Iso Step H` controls the iso footprint height; leave it at `0` for automatic `Tile W / 2`, or set it manually if your diamond footprint is different.
 
-For the 256x256 iso sheet with 4 columns and 4 rows, use `Tile W = 64` and `Tile H = 64`.
+
 
 Use the `Box` tool to drag out a perimeter, which is the clean path for room walls. Put grass/floor on `Ground`, switch to `Stack` or `Above`, select the wall/block tile, choose `Box`, then drag from one corner of the room to the opposite corner. It paints only the outline cells, including corners, instead of filling the whole room into a slab.
 
