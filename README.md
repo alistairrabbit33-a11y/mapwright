@@ -16,6 +16,8 @@ Current features:
 - Ctrl+Z undo for the last paint stroke
 - Space + mouse drag canvas panning
 - Resizeable map grid
+- Hover help tooltips on every control (what it does, how to use it, what it affects)
+- Skew Tile and Skew Object for generating isometric face variants
 - Save/load project JSON
 - Export clean map JSON
 - Export clean map PNG

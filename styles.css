@@ -280,3 +280,29 @@ input[type="file"] {
     flex-wrap: wrap;
   }
 }
+
+.help-tip {
+  position: fixed;
+  z-index: 1000;
+  display: none;
+  max-width: 280px;
+  padding: 8px 10px;
+  color: var(--text);
+  background: #11141a;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+[data-help] {
+  cursor: help;
+}
+
+[data-help] input,
+[data-help] select,
+.toolbar [data-help] {
+  cursor: auto;
+}

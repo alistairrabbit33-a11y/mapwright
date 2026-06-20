@@ -1,4 +1,4 @@
-const APP_VERSION = "live-wall-settings-1";
+const APP_VERSION = "help-tooltips-1";
 
 const state = {
   tileW: 64,
@@ -290,6 +290,32 @@ function generateSkewTileset() {
   drawIsoTopFromTexture(ctx, source.canvas, w * 3, 0, w, h);
   addTileset(`skewed-${source.name}-tile-${state.selectedTile}.png`, out.toDataURL("image/png"));
   setStatus("Generated skewed tile variants");
+}
+
+// Render one iso face of an arbitrary object PNG onto its own transparent canvas.
+function objectFaceDataUrl(image, faceFn, w, h) {
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const ctx = out.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  faceFn(ctx, image, 0, 0, w, h);
+  return out.toDataURL("image/png");
+}
+
+function generateSkewObject() {
+  const source = state.objectImages[state.activeObject];
+  if (!source) {
+    setStatus("Select an object first");
+    return;
+  }
+  const w = source.image.width;
+  const h = source.image.height;
+  const base = source.name.replace(/\.[^.]+$/, "");
+  addObjectImage(`${base}-iso-left.png`, objectFaceDataUrl(source.image, drawIsoLeftFaceFromTexture, w, h));
+  addObjectImage(`${base}-iso-right.png`, objectFaceDataUrl(source.image, drawIsoRightFaceFromTexture, w, h));
+  addObjectImage(`${base}-iso-top.png`, objectFaceDataUrl(source.image, drawIsoTopFromTexture, w, h));
+  setStatus("Generated skewed object variants");
 }
 
 function drawTileset() {
@@ -1343,6 +1369,7 @@ function wireUi() {
   }
 
   document.querySelector("#skewTile").addEventListener("click", generateSkewTileset);
+  document.querySelector("#skewObject").addEventListener("click", generateSkewObject);
 
   document.querySelector("#tilesetInput").addEventListener("change", event => {
     const files = [...event.target.files];
@@ -1687,8 +1714,112 @@ function wireUi() {
   window.addEventListener("resize", resizeCanvases);
 }
 
+// --- Hover help / tooltips --------------------------------------------------
+
+// Each entry: how to find the control -> what it does, how to use it, what it affects.
+const HELP_TEXT = {
+  "#tilesetInput": "Import tileset image(s). Each sheet you add can be picked from separately. Do this first, before painting. Affects: which tiles are available.",
+  "#tileW": "Width in pixels of one tile in the source sheet. Must match the sheet's real tile size or tiles get sliced wrong. Affects: how the sheet is cut up.",
+  "#tileH": "Height in pixels of one tile in the source sheet. Must match the sheet's real tile size or tiles get sliced wrong. Affects: how the sheet is cut up.",
+  "#margin": "Empty border (px) around the whole sheet before the first tile. Raise it if your sheet has an outer frame. Affects: where tile slicing starts.",
+  "#spacing": "Padding (px) between tiles in the sheet. Clicks inside the gap are ignored so you don't grab the wrong tile. Affects: tile slicing and picking.",
+  "#skewTile": "Generates iso top/left/right face variants from the selected tile and adds them as a new sheet. Use it to build isometric walls. Affects: adds new tiles.",
+  "[data-projection='orthogonal']": "Top-down view: flat rectangular grid. Best for classic 2D top-down maps.",
+  "[data-projection='isometric']": "Isometric view: diamond grid drawn at an angle, for 2.5D depth.",
+  "#toggleIsoFlat": "Iso only. Squashes iso row spacing so tall tile art isn't clipped. Turn off for full-height block iso. Affects: iso row height.",
+  "#isoStepH": "Iso only. Vertical height (px) of a diamond cell's footprint. 0 = automatic (Tile W / 2). Affects: iso cell spacing.",
+  "#stackCount": "STACK LAYER ONLY. How many copies of the tile each Brush/Box/Fill adds, piled upward to build wall height. Has no effect on Ground/Detail/Above.",
+  "#stackRise": "STACK LAYER ONLY. How far (px) each stacked copy is drawn upward. 0 = all copies sit flat on the same cell, so the wall won't rise. Has no effect on other layers.",
+  "#mapW": "Map width in tiles. Click Resize to apply. Tiles outside the new size get cropped. Affects: grid size.",
+  "#mapH": "Map height in tiles. Click Resize to apply. Tiles outside the new size get cropped. Affects: grid size.",
+  "#resizeMap": "Applies the Width / Height values above to the map grid.",
+  "[data-layer='ground']": "Base floor layer, one tile per cell. Paint grass, dirt, floors here. Wall Height / Height Step do nothing on this layer.",
+  "[data-layer='detail']": "Decoration overlay above Ground (flowers, cracks, rugs), one tile per cell. Wall Height / Height Step do nothing here.",
+  "[data-layer='stack']": "Vertical layer holding MULTIPLE tiles per cell. This is the only layer where Wall Height and Height Step work - use it to build walls and raised blocks.",
+  "[data-layer='above']": "Top overlay drawn over everything (rooftops, treetops, props above the player), one tile per cell. Wall Height / Height Step do nothing here.",
+  "[data-layer='collision']": "Paints a blocked/walkable flag (shown red) for your game's collision. Draws no tiles - just marks cells. Brush blocks a cell, Erase clears it.",
+  "#layerLift": "Shifts the whole active layer up/down on screen (px) live - handy for tuning wall faces. Disabled on Collision. Affects: the active layer only.",
+  "#layerIsoAnchor": "Iso only. Where the active layer's tiles anchor in the cell: Origin, Front Edge, or Back Edge. Use Back Edge for upright wall faces.",
+  "#applyLayerSettings": "Re-applies the current Wall Height, Height Step, and Iso Anchor to all matching copies of the selected tile already painted on this layer.",
+  "#objectInput": "Import PNGs as free-floating stamps (characters, houses, trees) placed on top of the map, separate from tiles.",
+  "#objectScale": "Size percent for newly stamped objects. 100 = original pixel size. Affects: new stamps only.",
+  "#objectOffsetX": "Nudges newly stamped objects sideways by this many px from the click/snap point.",
+  "#objectOffsetY": "Nudges newly stamped objects up/down by this many px from the click/snap point.",
+  "#toggleObjectSnap": "When on, stamped or moved objects snap to a tile anchor point instead of the raw cursor. Affects: placement precision.",
+  "#toggleObjectSnapAsTile": "Snaps the object exactly where a floor tile would sit (for 64x64 wall chunks). Ignores Snap Point and Object Pivot. Turns Object Snap on.",
+  "#objectSnapPoint": "Which point of the target cell an object snaps to: Center or an edge. Works with Object Snap.",
+  "#objectPivot": "Which point of the object lines up with the snap point (e.g. Bottom Center sits the feet on the anchor).",
+  "#selectedObjectW": "Pixel width of the currently selected object. Edit to resize it precisely.",
+  "#selectedObjectH": "Pixel height of the currently selected object. Edit to resize it precisely.",
+  "#skewObject": "Generates isometric left-face, right-face, and top variants of the selected object PNG and adds them as new objects you can stamp. Good for turning a flat sprite into iso wall faces.",
+  "#duplicateObject": "Copies the selected object one iso tile over - good for laying even wall runs.",
+  "#deleteObject": "Removes the selected object from the map.",
+  "[data-tool='paint']": "Brush: paint the selected tile on the active layer. Click or drag.",
+  "[data-tool='erase']": "Erase: remove the tile (or the top object) under the cursor.",
+  "[data-tool='fill']": "Fill: flood-fill all connected matching cells with the selected tile.",
+  "[data-tool='box']": "Box: drag a rectangle to paint only its outline/perimeter - the clean way to make room walls.",
+  "[data-tool='pick']": "Pick (eyedropper): click a painted cell to load its tile and settings as your current selection.",
+  "[data-tool='stamp']": "Stamp: place the selected object PNG on the map.",
+  "[data-tool='pan']": "Pan: drag to move the view. You can also hold Space + drag, or middle-mouse drag, with any tool.",
+  "#zoomOut": "Zoom out. The mouse wheel also zooms.",
+  "#zoomIn": "Zoom in. The mouse wheel also zooms.",
+  "#toggleGrid": "Show or hide the cell grid overlay.",
+  "#newMap": "Clear the map to a blank grid. Keeps loaded tilesets and objects.",
+  "#saveProject": "Save the full project as JSON, including embedded tileset images, so you can reload it later exactly as-is.",
+  "#loadProject": "Load a previously saved project JSON.",
+  "#exportJson": "Export clean map data as JSON (layers without embedded images) for use in your game engine.",
+  "#exportPng": "Export the rendered map as a flat PNG image."
+};
+
+function wireHelpTips() {
+  const tip = document.createElement("div");
+  tip.className = "help-tip";
+  document.body.appendChild(tip);
+  let activeTarget = null;
+
+  const position = (x, y) => {
+    const pad = 14;
+    const rect = tip.getBoundingClientRect();
+    let left = x + pad;
+    let top = y + pad;
+    if (left + rect.width > window.innerWidth - 8) left = x - rect.width - pad;
+    if (top + rect.height > window.innerHeight - 8) top = y - rect.height - pad;
+    tip.style.left = `${Math.max(8, left)}px`;
+    tip.style.top = `${Math.max(8, top)}px`;
+  };
+
+  // Attach the help text to the visible control (the wrapping label for inputs/selects).
+  for (const [selector, text] of Object.entries(HELP_TEXT)) {
+    const el = document.querySelector(selector);
+    if (!el) continue;
+    const host = (el.tagName === "INPUT" || el.tagName === "SELECT") ? (el.closest("label") || el) : el;
+    host.dataset.help = text;
+    host.removeAttribute("title");
+  }
+
+  document.addEventListener("mouseover", event => {
+    const el = event.target.closest("[data-help]");
+    if (!el) return;
+    activeTarget = el;
+    tip.textContent = el.dataset.help;
+    tip.style.display = "block";
+    position(event.clientX, event.clientY);
+  });
+  document.addEventListener("mousemove", event => {
+    if (activeTarget) position(event.clientX, event.clientY);
+  });
+  document.addEventListener("mouseout", event => {
+    const el = event.target.closest("[data-help]");
+    if (el && (!event.relatedTarget || !el.contains(event.relatedTarget))) {
+      activeTarget = null;
+      tip.style.display = "none";
+    }
+  });
+}
+
 resetLayers();
 wireUi();
+wireHelpTips();
 renderTilesetList();
 drawTileset();
 resizeCanvases();
