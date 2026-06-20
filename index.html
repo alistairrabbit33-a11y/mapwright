@@ -29,6 +29,15 @@
         <button id="skewTile">Skew Tile</button>
         <div class="tileset-list" id="tilesetList"></div>
         <canvas id="tilesetCanvas" width="256" height="256"></canvas>
+        <div class="panel-title">Block Type</div>
+        <div class="segmented type-grid" id="tileType">
+          <button data-type="none" class="active">None</button>
+          <button data-type="solid">Solid</button>
+          <button data-type="translucent">Glass</button>
+          <button data-type="plantation">Plant</button>
+          <button data-type="light">Light</button>
+        </div>
+        <div class="type-hint" id="tileTypeHint">Tag the selected tile so lighting knows how it casts shadow.</div>
       </section>
 
       <section class="panel">
@@ -48,6 +57,16 @@
           <label>Height <input id="mapH" type="number" min="4" max="200" value="20"></label>
         </div>
         <button id="resizeMap">Resize</button>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Lighting</div>
+        <button id="toggleLighting">Lighting Preview</button>
+        <div class="control-grid">
+          <label>Sun Angle <input id="lightAngle" type="number" min="0" max="360" value="135"></label>
+          <label>Shadow Len <input id="lightLength" type="number" min="0" max="400" value="70"></label>
+        </div>
+        <label>Light Radius <input id="lightRadius" type="number" min="0" max="800" value="180"></label>
       </section>
 
       <section class="panel">
@@ -146,6 +165,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=20260619-live-wall-settings-1"></script>
+  <script src="app.js?v=20260620-block-types-lighting-1"></script>
 </body>
 </html>
