@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Low Topdown Map Editor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <aside class="sidebar">
+      <header class="brand">
+        <h1>Mapwright</h1>
+        <span id="status">Ready</span>
+      </header>
+
+      <section class="panel">
+        <div class="panel-title">Tileset</div>
+        <label class="file-button">
+          <input id="tilesetInput" type="file" accept="image/*" multiple>
+          Add images
+        </label>
+        <div class="control-grid">
+          <label>Tile W <input id="tileW" type="number" min="4" max="256" value="64"></label>
+          <label>Tile H <input id="tileH" type="number" min="4" max="256" value="64"></label>
+          <label>Margin <input id="margin" type="number" min="0" max="64" value="0"></label>
+          <label>Gap <input id="spacing" type="number" min="0" max="64" value="0"></label>
+        </div>
+        <button id="skewTile">Skew Tile</button>
+        <div class="tileset-list" id="tilesetList"></div>
+        <canvas id="tilesetCanvas" width="256" height="256"></canvas>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Map</div>
+        <div class="segmented" id="projection">
+          <button data-projection="orthogonal" class="active">Top</button>
+          <button data-projection="isometric">Iso</button>
+        </div>
+        <button id="toggleIsoFlat" class="active">Flat Iso</button>
+        <label>Iso Step H <input id="isoStepH" type="number" min="0" max="256" value="0"></label>
+        <div class="control-grid">
+          <label>Wall Height <input id="stackCount" type="number" min="1" max="12" value="1"></label>
+          <label>Height Step <input id="stackRise" type="number" min="0" max="128" value="0"></label>
+        </div>
+        <div class="control-grid">
+          <label>Width <input id="mapW" type="number" min="4" max="200" value="30"></label>
+          <label>Height <input id="mapH" type="number" min="4" max="200" value="20"></label>
+        </div>
+        <button id="resizeMap">Resize</button>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Layer</div>
+        <div class="segmented" id="layers">
+          <button data-layer="ground" class="active">Ground</button>
+          <button data-layer="detail">Detail</button>
+          <button data-layer="stack">Stack</button>
+          <button data-layer="above">Above</button>
+          <button data-layer="collision">Collision</button>
+        </div>
+        <label>Layer Lift <input id="layerLift" type="number" min="-256" max="256" value="0"></label>
+        <label>Iso Anchor
+          <select id="layerIsoAnchor">
+            <option value="origin">Origin</option>
+            <option value="front">Front Edge</option>
+            <option value="back">Back Edge</option>
+          </select>
+        </label>
+        <button id="applyLayerSettings">Apply Settings</button>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Objects</div>
+        <label class="file-button">
+          <input id="objectInput" type="file" accept="image/*" multiple>
+          Add PNGs
+        </label>
+        <label>Scale <input id="objectScale" type="number" min="10" max="400" value="100"></label>
+        <div class="control-grid">
+          <label>Offset X <input id="objectOffsetX" type="number" min="-4096" max="4096" value="0"></label>
+          <label>Offset Y <input id="objectOffsetY" type="number" min="-4096" max="4096" value="0"></label>
+        </div>
+        <button id="toggleObjectSnap">Object Snap</button>
+        <button id="toggleObjectSnapAsTile">Snap As Tile</button>
+        <label>Snap Point
+          <select id="objectSnapPoint">
+            <option value="center">Center</option>
+            <option value="north">North Edge</option>
+            <option value="east">East Edge</option>
+            <option value="south">South Edge</option>
+            <option value="west">West Edge</option>
+          </select>
+        </label>
+        <label>Object Pivot
+          <select id="objectPivot">
+            <option value="bottom-center">Bottom Center</option>
+            <option value="center">Center</option>
+            <option value="top-left">Top Left</option>
+            <option value="top-center">Top Center</option>
+            <option value="top-right">Top Right</option>
+            <option value="middle-left">Middle Left</option>
+            <option value="middle-right">Middle Right</option>
+            <option value="bottom-left">Bottom Left</option>
+            <option value="bottom-right">Bottom Right</option>
+          </select>
+        </label>
+        <div class="control-grid">
+          <label>Obj W <input id="selectedObjectW" type="number" min="1" max="4096" value="0"></label>
+          <label>Obj H <input id="selectedObjectH" type="number" min="1" max="4096" value="0"></label>
+        </div>
+        <button id="duplicateObject">Duplicate Object</button>
+        <button id="deleteObject">Delete Object</button>
+        <div class="tileset-list object-list" id="objectList"></div>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <div class="toolbar">
+        <div class="segmented" id="tools">
+          <button data-tool="paint" class="active" title="Paint">Brush</button>
+          <button data-tool="erase" title="Erase">Erase</button>
+          <button data-tool="fill" title="Fill">Fill</button>
+          <button data-tool="box" title="Drag a perimeter box">Box</button>
+          <button data-tool="pick" title="Pick">Pick</button>
+          <button data-tool="stamp" title="Stamp object">Stamp</button>
+          <button data-tool="pan" title="Pan">Pan</button>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <button id="zoomOut" title="Zoom out">-</button>
+        <output id="zoomLabel">100%</output>
+        <button id="zoomIn" title="Zoom in">+</button>
+        <button id="toggleGrid" title="Show grid">Grid</button>
+        <button id="newMap">New</button>
+        <button id="saveProject">Save</button>
+        <label class="file-button compact">
+          <input id="loadProject" type="file" accept="application/json">
+          Load
+        </label>
+        <button id="exportJson">JSON</button>
+        <button id="exportPng">PNG</button>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="mapCanvas" width="960" height="640"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js?v=20260619-live-wall-settings-1"></script>
+</body>
+</html>
